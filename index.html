@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f3ee" />
+    <title>Dropzone | Document uploader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <div class="ambient ambient-one"></div>
+      <div class="ambient ambient-two"></div>
+
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="Dropzone home">
+          <span class="brand-mark" aria-hidden="true">↗</span>
+          <span>dropzone</span>
+        </a>
+        <span class="secure-label"><span class="status-dot"></span> secure workspace</span>
+      </header>
+
+      <section class="hero" aria-labelledby="page-title">
+        <div class="eyebrow"><span>01</span> single document intake</div>
+        <h1 id="page-title">Bring your next<br /><em>big idea</em> to life.</h1>
+        <p class="intro">Start with a document. We’ll make sure it arrives safe, sound, and ready for what’s next.</p>
+      </section>
+
+      <section class="uploader-wrap" aria-label="Document uploader">
+        <div id="uploaderContent" class="uploader-content">
+          <div class="upload-card" id="dropZone">
+            <div class="card-topline"><span>UPLOAD / 001</span><span class="card-rule"></span></div>
+            <div class="upload-icon" aria-hidden="true">
+              <span class="icon-sheet"></span>
+              <span class="icon-arrow">↑</span>
+            </div>
+            <div class="upload-copy">
+              <h2>Drop your file here</h2>
+              <p>or choose one from your device</p>
+            </div>
+            <label class="browse-button" for="fileInput">
+              <span>Browse files</span>
+              <span class="button-arrow" aria-hidden="true">↗</span>
+            </label>
+            <input id="fileInput" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+            <div class="drop-hint"><span class="tiny-dot"></span> drag &amp; drop enabled</div>
+          </div>
+
+          <div class="file-details" id="fileDetails" aria-live="polite">
+            <span class="detail-label">SUPPORTED</span>
+            <span class="detail-value">PDF <i>•</i> DOCX</span>
+            <span class="detail-label">MAX SIZE</span>
+            <span class="detail-value">10 MB</span>
+          </div>
+
+          <div class="selected-file" id="selectedFile" aria-live="polite" hidden>
+            <span class="file-badge" aria-hidden="true">DOC</span>
+            <span class="file-summary">
+              <strong id="selectedFileName">No file selected</strong>
+              <span id="selectedFileMeta">Choose a document to continue</span>
+            </span>
+            <button class="remove-file" id="removeFile" type="button" aria-label="Remove selected file">×</button>
+          </div>
+          <button class="upload-button" id="uploadButton" type="button" disabled>
+            <span id="uploadButtonText">Upload document</span>
+            <span class="button-arrow" aria-hidden="true">↗</span>
+          </button>
+        </div>
+
+        <div class="progress-panel" id="progressPanel" aria-live="polite">
+          <div class="progress-meta"><span>UPLOADING DOCUMENT</span><span id="progressPercent">0%</span></div>
+          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+          <p id="progressStatus">Preparing your document...</p>
+        </div>
+      </section>
+
+      <footer class="footer-note"><span>DROPZONE / FILE INTAKE</span><span>Built for focused work</span></footer>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="assertive">
+      <div class="toast-icon" id="toastIcon">!</div>
+      <div><span class="toast-kicker" id="toastKicker">UPLOAD ERROR</span><strong id="toastTitle">File not supported</strong><p id="toastMessage">Please choose a PDF or DOCX file under 10 MB.</p></div>
+      <button class="toast-close" id="toastClose" type="button" aria-label="Dismiss notification">×</button>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
