@@ -15,6 +15,7 @@ const toastKicker = document.querySelector('#toastKicker');
 const toastTitle = document.querySelector('#toastTitle');
 const toastMessage = document.querySelector('#toastMessage');
 const toastClose = document.querySelector('#toastClose');
+const apiBaseUrl = 'http://127.0.0.1:8000';
 
 let chosenFile = null;
 let toastTimer = null;
@@ -88,7 +89,7 @@ dropZone.addEventListener('drop', (event) => setFile(event.dataTransfer.files[0]
 
 toastClose.addEventListener('click', () => toast.classList.remove('show'));
 
-uploadButton.addEventListener('click', () => {
+uploadButton.addEventListener('click', async () => {
   if (!chosenFile) return;
   if (!isSupported(chosenFile)) {
     showToast('error', 'File not supported', 'Please choose a PDF or DOCX file under 10 MB.');
@@ -99,22 +100,36 @@ uploadButton.addEventListener('click', () => {
   resetProgress();
   uploaderWrap.classList.add('is-uploading');
   uploadButton.disabled = true;
-  let progress = 0;
-  const progressTimer = window.setInterval(() => {
-    progress += Math.floor(Math.random() * 13) + 7;
-    if (progress >= 100) {
-      progress = 100;
-      window.clearInterval(progressTimer);
-      progressStatus.textContent = 'Your document is ready to use.';
-      window.setTimeout(() => {
-        uploaderWrap.classList.remove('is-uploading');
-        clearSelectedFile();
-        showToast('success', 'Document uploaded', `${uploadedFileName} is ready in your workspace.`);
-      }, 500);
-    } else {
-      progressStatus.textContent = progress < 48 ? 'Reading document contents...' : 'Securing your upload...';
+  progressStatus.textContent = 'Uploading to the AI backend...';
+  progressFill.style.width = '20%';
+  progressPercent.textContent = '20%';
+
+  try {
+    const formData = new FormData();
+    formData.append('file', chosenFile);
+
+    const response = await fetch(`${apiBaseUrl}/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(payload?.detail || 'The upload could not be completed.');
     }
-    progressFill.style.width = `${progress}%`;
-    progressPercent.textContent = `${progress}%`;
-  }, 220);
+
+    progressFill.style.width = '100%';
+    progressPercent.textContent = '100%';
+    progressStatus.textContent = 'Document processed successfully.';
+    clearSelectedFile();
+    showToast('success', 'Document uploaded', `${uploadedFileName} is ready for the next step.`);
+  } catch (error) {
+    progressFill.style.width = '0%';
+    progressPercent.textContent = '0%';
+    progressStatus.textContent = 'Upload failed.';
+    showToast('error', 'Upload failed', error.message || 'Please try again.');
+  } finally {
+    uploaderWrap.classList.remove('is-uploading');
+    uploadButton.disabled = !chosenFile;
+  }
 });
