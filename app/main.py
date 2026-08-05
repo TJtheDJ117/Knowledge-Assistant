@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,6 +12,8 @@ from pypdf import PdfReader
 class UploadResponse(BaseModel):
     filename: str
     extracted_text: str
+    cleaned_text: str
+    word_count: int
     saved_path: str
 
 
@@ -42,9 +45,13 @@ def create_app(upload_dir: Optional[Path] = None) -> FastAPI:
         destination.write_bytes(contents)
 
         extracted_text = extract_text(destination)
+        cleaned_text = preprocess_text(extracted_text)
+        word_count = len(cleaned_text.split())
         return UploadResponse(
             filename=file.filename,
             extracted_text=extracted_text,
+            cleaned_text=cleaned_text,
+            word_count=word_count,
             saved_path=str(destination),
         )
 
@@ -65,3 +72,9 @@ def extract_text(path: Path) -> str:
         return "\n".join(paragraph.text for paragraph in document.paragraphs if paragraph.text).strip()
 
     raise ValueError("Unsupported file type")
+
+
+def preprocess_text(text: str) -> str:
+    cleaned = " ".join(text.split())
+    df = pd.DataFrame({"text": [cleaned]})
+    return df.loc[0, "text"]
