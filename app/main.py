@@ -55,6 +55,26 @@ def create_app(upload_dir: Optional[Path] = None) -> FastAPI:
             saved_path=str(destination),
         )
 
+    @app.get("/documents")
+    def list_documents() -> list[dict[str, str]]:
+        documents = []
+        for path in sorted(upload_path.iterdir()):
+            if path.is_file():
+                documents.append({
+                    "filename": path.name,
+                    "size": str(path.stat().st_size),
+                    "path": str(path),
+                })
+        return documents
+
+    @app.delete("/documents/{filename}")
+    def delete_document(filename: str) -> dict[str, bool]:
+        target = upload_path / filename
+        if not target.exists():
+            raise HTTPException(status_code=404, detail="Document not found")
+        target.unlink()
+        return {"deleted": True}
+
     return app
 
 
