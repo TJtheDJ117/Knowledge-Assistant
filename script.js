@@ -15,10 +15,65 @@ const toastKicker = document.querySelector('#toastKicker');
 const toastTitle = document.querySelector('#toastTitle');
 const toastMessage = document.querySelector('#toastMessage');
 const toastClose = document.querySelector('#toastClose');
+const documentList = document.querySelector('#documentList');
+const refreshDocuments = document.querySelector('#refreshDocuments');
 const apiBaseUrl = 'http://127.0.0.1:8000';
 
 let chosenFile = null;
 let toastTimer = null;
+
+async function loadDocuments() {
+  if (!documentList) return;
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/documents`);
+    const documents = await response.json();
+
+    if (!response.ok) {
+      throw new Error(documents?.detail || 'Unable to load documents.');
+    }
+
+    if (!documents.length) {
+      documentList.innerHTML = '<div class="empty-state">No uploaded documents yet. Add your first PDF or DOCX file.</div>';
+      return;
+    }
+
+    documentList.innerHTML = documents.map((document) => `
+      <div class="document-item">
+        <div class="document-meta">
+          <span class="document-icon">DOC</span>
+          <div>
+            <div class="document-name">${document.filename}</div>
+            <div class="document-size">${(Number(document.size) / 1024 / 1024).toFixed(2)} MB</div>
+          </div>
+        </div>
+        <button class="delete-document" type="button" data-filename="${document.filename}">Delete</button>
+      </div>
+    `).join('');
+
+    documentList.querySelectorAll('.delete-document').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const filename = button.dataset.filename;
+        try {
+          const deleteResponse = await fetch(`${apiBaseUrl}/documents/${encodeURIComponent(filename)}`, {
+            method: 'DELETE',
+          });
+          const payload = await deleteResponse.json().catch(() => ({}));
+          if (!deleteResponse.ok) {
+            throw new Error(payload?.detail || 'Unable to delete document.');
+          }
+          showToast('success', 'Document removed', `${filename} was deleted from your workspace.`);
+          loadDocuments();
+        } catch (error) {
+          showToast('error', 'Delete failed', error.message || 'Please try again.');
+        }
+      });
+    });
+  } catch (error) {
+    documentList.innerHTML = '<div class="empty-state">Unable to load documents right now.</div>';
+    showToast('error', 'Workspace error', error.message || 'Please refresh later.');
+  }
+}
 
 function isSupported(file) {
   const extension = file.name.split('.').pop().toLowerCase();
@@ -88,6 +143,9 @@ fileInput.addEventListener('change', (event) => setFile(event.target.files[0]));
 dropZone.addEventListener('drop', (event) => setFile(event.dataTransfer.files[0]));
 
 toastClose.addEventListener('click', () => toast.classList.remove('show'));
+refreshDocuments.addEventListener('click', loadDocuments);
+
+loadDocuments();
 
 uploadButton.addEventListener('click', async () => {
   if (!chosenFile) return;
@@ -123,6 +181,7 @@ uploadButton.addEventListener('click', async () => {
     progressStatus.textContent = 'Document processed successfully.';
     clearSelectedFile();
     showToast('success', 'Document uploaded', `${uploadedFileName} is ready for the next step.`);
+    loadDocuments();
   } catch (error) {
     progressFill.style.width = '0%';
     progressPercent.textContent = '0%';

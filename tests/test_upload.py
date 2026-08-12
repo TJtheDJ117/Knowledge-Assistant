@@ -45,3 +45,31 @@ def test_rejects_unsupported_file_type(tmp_path: Path) -> None:
 
     assert response.status_code == 400
     assert "Unsupported file type" in response.json()["detail"]
+
+
+def test_lists_uploaded_documents(tmp_path: Path) -> None:
+    app = create_app(upload_dir=tmp_path)
+    client = TestClient(app)
+
+    file_path = tmp_path / "example.docx"
+    file_path.write_bytes(b"fake docx content")
+
+    response = client.get("/documents")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert any(item["filename"] == "example.docx" for item in payload)
+
+
+def test_deletes_uploaded_document(tmp_path: Path) -> None:
+    app = create_app(upload_dir=tmp_path)
+    client = TestClient(app)
+
+    file_path = tmp_path / "example.docx"
+    file_path.write_bytes(b"fake docx content")
+
+    response = client.delete("/documents/example.docx")
+
+    assert response.status_code == 200
+    assert response.json()["deleted"] is True
+    assert not file_path.exists()
