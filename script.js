@@ -38,18 +38,27 @@ async function loadDocuments() {
       return;
     }
 
-    documentList.innerHTML = documents.map((document) => `
-      <div class="document-item">
-        <div class="document-meta">
-          <span class="document-icon">DOC</span>
-          <div>
-            <div class="document-name">${document.filename}</div>
-            <div class="document-size">${(Number(document.size) / 1024 / 1024).toFixed(2)} MB</div>
+    documentList.innerHTML = documents.map((document) => {
+      const categoryName = document.category || 'General';
+      const categoryClass = `category-${categoryName.toLowerCase().replace(/\s+/g, '-')}`;
+      const fileExtension = (document.filename.split('.').pop() || 'FILE').toUpperCase();
+      const iconClass = (fileExtension === 'PDF' ? 'pdf' : fileExtension === 'DOCX' ? 'docx' : fileExtension === 'TXT' ? 'txt' : 'file');
+      return `
+        <div class="document-item">
+          <div class="document-meta">
+            <span class="document-icon ${iconClass}">${fileExtension}</span>
+            <div class="document-info">
+              <div class="document-name">${document.filename}</div>
+              <div class="document-size">${(Number(document.size) / 1024 / 1024).toFixed(2)} MB</div>
+            </div>
+          </div>
+          <div class="document-actions">
+            <span class="document-category ${categoryClass}">${categoryName}</span>
+            <button class="delete-document" type="button" data-filename="${document.filename}">Delete</button>
           </div>
         </div>
-        <button class="delete-document" type="button" data-filename="${document.filename}">Delete</button>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     documentList.querySelectorAll('.delete-document').forEach((button) => {
       button.addEventListener('click', async () => {
@@ -113,8 +122,11 @@ function setFile(file) {
   if (!file) return;
   chosenFile = file;
   const extension = file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : 'FILE';
+  const fileTypeClass = (extension === 'PDF' ? 'pdf' : extension === 'DOCX' ? 'docx' : extension === 'TXT' ? 'txt' : 'file');
   selectedFileName.textContent = file.name;
   selectedFileMeta.textContent = `${extension} · ${(file.size / 1024 / 1024).toFixed(2)} MB · ready to upload`;
+  selectedFile.querySelector('.file-badge').textContent = extension;
+  selectedFile.querySelector('.file-badge').className = `file-badge ${fileTypeClass}`;
   selectedFile.hidden = false;
   uploadButton.disabled = false;
   if (!isSupported(file)) {
@@ -180,7 +192,8 @@ uploadButton.addEventListener('click', async () => {
     progressPercent.textContent = '100%';
     progressStatus.textContent = 'Document processed successfully.';
     clearSelectedFile();
-    showToast('success', 'Document uploaded', `${uploadedFileName} is ready for the next step.`);
+    const uploadedCategory = payload?.category || 'General';
+    showToast('success', 'Document uploaded', `${uploadedFileName} classified as ${uploadedCategory}.`);
     loadDocuments();
   } catch (error) {
     progressFill.style.width = '0%';

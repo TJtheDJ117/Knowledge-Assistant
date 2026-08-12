@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +16,9 @@ class UploadResponse(BaseModel):
     cleaned_text: str
     word_count: int
     saved_path: str
+    category: str
+    confidence: float
+    matched_keywords: list[str]
 
 
 def create_app(upload_dir: Optional[Path] = None) -> FastAPI:
@@ -47,23 +51,35 @@ def create_app(upload_dir: Optional[Path] = None) -> FastAPI:
         extracted_text = extract_text(destination)
         cleaned_text = preprocess_text(extracted_text)
         word_count = len(cleaned_text.split())
+        classification = classify_document(cleaned_text, file.filename)
         return UploadResponse(
             filename=file.filename,
             extracted_text=extracted_text,
             cleaned_text=cleaned_text,
             word_count=word_count,
             saved_path=str(destination),
+            category=classification["category"],
+            confidence=classification["confidence"],
+            matched_keywords=classification["matched_keywords"],
         )
 
     @app.get("/documents")
-    def list_documents() -> list[dict[str, str]]:
+    def list_documents() -> list[dict[str, str | int | float | list[str]]]:
         documents = []
         for path in sorted(upload_path.iterdir()):
             if path.is_file():
+                try:
+                    text = extract_text(path)
+                    classification = classify_document(text, path.name)
+                except Exception:
+                    classification = {"category": "General", "confidence": 0.15, "matched_keywords": []}
                 documents.append({
                     "filename": path.name,
                     "size": str(path.stat().st_size),
                     "path": str(path),
+                    "category": classification["category"],
+                    "confidence": classification["confidence"],
+                    "matched_keywords": classification["matched_keywords"],
                 })
         return documents
 
@@ -98,3 +114,104 @@ def preprocess_text(text: str) -> str:
     cleaned = " ".join(text.split())
     df = pd.DataFrame({"text": [cleaned]})
     return df.loc[0, "text"]
+
+
+def classify_document(text: str, filename: str = "") -> dict[str, object]:
+    normalized = re.sub(r"[^a-z0-9\s]", " ", text.lower())
+    normalized = " ".join(normalized.split())
+    filename_text = filename.lower()
+
+    rules = {
+        "HR": [
+            "employee",
+            "benefits",
+            "policy",
+            "leave",
+            "staff",
+            "training",
+            "salary",
+            "payroll",
+            "performance",
+            "recruitment",
+            "workforce",
+            "hours",
+        ],
+        "Finance": [
+            "invoice",
+            "budget",
+            "revenue",
+            "expense",
+            "cost",
+            "financial",
+            "tax",
+            "cash",
+            "forecast",
+            "profit",
+            "salary",
+            "payroll",
+        ],
+        "Legal": [
+            "contract",
+            "agreement",
+            "compliance",
+            "terms",
+            "liability",
+            "legal",
+            "clause",
+            "policy",
+            "privacy",
+            "termination",
+            "audit",
+        ],
+        "Technical": [
+            "api",
+            "software",
+            "system",
+            "application",
+            "database",
+            "deployment",
+            "cloud",
+            "backend",
+            "frontend",
+            "code",
+            "server",
+            "security",
+        ],
+        "Operations": [
+            "process",
+            "workflow",
+            "supply",
+            "inventory",
+            "shipment",
+            "logistics",
+            "operations",
+            "vendor",
+            "delivery",
+            "facility",
+            "timeline",
+        ],
+    }
+
+    scores: dict[str, float] = {}
+    matches_by_category: dict[str, list[str]] = {}
+
+    for category, keywords in rules.items():
+        matches = sorted({keyword for keyword in keywords if keyword in normalized or keyword in filename_text})
+        if matches:
+            coverage = len(matches) / max(1, len(keywords))
+            scores[category] = round(min(1.0, coverage + 0.15), 2)
+            matches_by_category[category] = matches
+
+    if not scores:
+        return {"category": "General", "confidence": 0.15, "matched_keywords": []}
+
+    best_category, best_score = max(
+        scores.items(),
+        key=lambda item: (item[1], len(matches_by_category[item[0]])),
+    )
+
+    return {
+        "category": best_category,
+        "confidence": float(best_score),
+        "matched_keywords": matches_by_category[best_category],
+    }
