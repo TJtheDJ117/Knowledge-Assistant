@@ -17,10 +17,12 @@ const toastMessage = document.querySelector('#toastMessage');
 const toastClose = document.querySelector('#toastClose');
 const documentList = document.querySelector('#documentList');
 const refreshDocuments = document.querySelector('#refreshDocuments');
+const selectionCount = document.querySelector('#selectionCount');
 const apiBaseUrl = 'http://127.0.0.1:8000';
 
-let chosenFile = null;
+let chosenFiles = [];
 let toastTimer = null;
+const maxBatchUploads = 5;
 
 async function loadDocuments() {
   if (!documentList) return;
@@ -102,8 +104,9 @@ function showToast(type, title, message) {
 }
 
 function clearSelectedFile() {
-  chosenFile = null;
+  chosenFiles = [];
   fileInput.value = '';
+  selectionCount.textContent = '0 FILES SELECTED';
   selectedFile.hidden = true;
   uploadButton.disabled = true;
 }
@@ -118,27 +121,37 @@ function resetProgress() {
   });
 }
 
-function setFile(file) {
-  if (!file) return;
-  chosenFile = file;
-  const extension = file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : 'FILE';
-  const fileTypeClass = (extension === 'PDF' ? 'pdf' : extension === 'DOCX' ? 'docx' : extension === 'TXT' ? 'txt' : 'file');
-  selectedFileName.textContent = file.name;
-  selectedFileMeta.textContent = `${extension} · ${(file.size / 1024 / 1024).toFixed(2)} MB · ready to upload`;
-  selectedFile.querySelector('.file-badge').textContent = extension;
-  selectedFile.querySelector('.file-badge').className = `file-badge ${fileTypeClass}`;
+function setFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  const existingNames = new Set(chosenFiles.map((file) => file.name));
+  const newFiles = files.filter((file) => !existingNames.has(file.name));
+  const combinedFiles = [...chosenFiles, ...newFiles];
+
+  if (combinedFiles.length > maxBatchUploads) {
+    showToast('error', 'Upload limit reached', 'You can select a maximum of 5 documents at a time.');
+    return;
+  }
+
+  chosenFiles = combinedFiles;
+  selectionCount.textContent = `${chosenFiles.length} DOCUMENT${chosenFiles.length === 1 ? '' : 'S'} SELECTED`;
+  selectedFile.querySelector('.selected-files-list').innerHTML = `
+      ${chosenFiles.map((file) => {
+        const extension = file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : 'FILE';
+        const fileTypeClass = (extension === 'PDF' ? 'pdf' : extension === 'DOCX' ? 'docx' : 'file');
+        return `<div class="selected-file-row"><span class="file-badge ${fileTypeClass}" aria-hidden="true">${extension}</span><span class="file-summary"><strong>${file.name}</strong><span>${(file.size / 1024 / 1024).toFixed(2)} MB</span></span></div>`;
+      }).join('')}
+  `;
   selectedFile.hidden = false;
   uploadButton.disabled = false;
-  if (!isSupported(file)) {
-    showToast('error', 'File not supported', 'Please choose a PDF or DOCX file under 10 MB.');
+  if (newFiles.some((file) => !isSupported(file))) {
+    showToast('error', 'File not supported', 'Please choose PDF or DOCX files under 10 MB.');
   }
 }
 
-removeFile.addEventListener('click', () => {
-  clearSelectedFile();
-});
+removeFile.addEventListener('click', clearSelectedFile);
 
-fileInput.addEventListener('change', (event) => setFile(event.target.files[0]));
+fileInput.addEventListener('change', (event) => setFiles(event.target.files));
 
 ['dragenter', 'dragover'].forEach((eventName) => {
   dropZone.addEventListener(eventName, (event) => {
@@ -152,7 +165,7 @@ fileInput.addEventListener('change', (event) => setFile(event.target.files[0]));
     dropZone.classList.remove('drop-active');
   });
 });
-dropZone.addEventListener('drop', (event) => setFile(event.dataTransfer.files[0]));
+dropZone.addEventListener('drop', (event) => setFiles(event.dataTransfer.files));
 
 toastClose.addEventListener('click', () => toast.classList.remove('show'));
 refreshDocuments.addEventListener('click', loadDocuments);
@@ -160,25 +173,25 @@ refreshDocuments.addEventListener('click', loadDocuments);
 loadDocuments();
 
 uploadButton.addEventListener('click', async () => {
-  if (!chosenFile) return;
-  if (!isSupported(chosenFile)) {
-    showToast('error', 'File not supported', 'Please choose a PDF or DOCX file under 10 MB.');
+  if (!chosenFiles.length) return;
+  if (chosenFiles.length > maxBatchUploads || chosenFiles.some((file) => !isSupported(file))) {
+    showToast('error', 'Upload not available', 'Please choose up to 5 PDF or DOCX files under 10 MB each.');
     return;
   }
 
-  const uploadedFileName = chosenFile.name;
+  const uploadedFileCount = chosenFiles.length;
   resetProgress();
   uploaderWrap.classList.add('is-uploading');
   uploadButton.disabled = true;
-  progressStatus.textContent = 'Uploading to the AI backend...';
+  progressStatus.textContent = `Uploading and categorizing ${uploadedFileCount} document${uploadedFileCount === 1 ? '' : 's'}...`;
   progressFill.style.width = '20%';
   progressPercent.textContent = '20%';
 
   try {
     const formData = new FormData();
-    formData.append('file', chosenFile);
+    chosenFiles.forEach((file) => formData.append('files', file));
 
-    const response = await fetch(`${apiBaseUrl}/upload`, {
+    const response = await fetch(`${apiBaseUrl}/uploads`, {
       method: 'POST',
       body: formData,
     });
@@ -190,10 +203,9 @@ uploadButton.addEventListener('click', async () => {
 
     progressFill.style.width = '100%';
     progressPercent.textContent = '100%';
-    progressStatus.textContent = 'Document processed successfully.';
+    progressStatus.textContent = `${uploadedFileCount} document${uploadedFileCount === 1 ? '' : 's'} processed successfully.`;
     clearSelectedFile();
-    const uploadedCategory = payload?.category || 'General';
-    showToast('success', 'Document uploaded', `${uploadedFileName} classified as ${uploadedCategory}.`);
+    showToast('success', 'Documents uploaded', `${uploadedFileCount} document${uploadedFileCount === 1 ? '' : 's'} classified and added to your workspace.`);
     loadDocuments();
   } catch (error) {
     progressFill.style.width = '0%';
@@ -202,6 +214,6 @@ uploadButton.addEventListener('click', async () => {
     showToast('error', 'Upload failed', error.message || 'Please try again.');
   } finally {
     uploaderWrap.classList.remove('is-uploading');
-    uploadButton.disabled = !chosenFile;
+    uploadButton.disabled = !chosenFiles.length;
   }
 });

@@ -100,3 +100,43 @@ def test_upload_classifies_document_category(tmp_path: Path) -> None:
     payload = response.json()
     assert payload["category"] == "HR"
     assert payload["confidence"] >= 0.5
+
+    def test_batch_upload_processes_and_categorizes_each_document(tmp_path: Path) -> None:
+        app = create_app(upload_dir=tmp_path)
+        client = TestClient(app)
+
+        response = client.post(
+            "/uploads",
+            files=[
+                ("files", ("hr-policy.docx", _docx_bytes("Employee benefits and annual leave policy"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")),
+                ("files", ("api-guide.docx", _docx_bytes("API backend database deployment and server security"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")),
+            ],
+        )
+
+        assert response.status_code == 200
+        documents = response.json()["documents"]
+        assert len(documents) == 2
+        assert documents[0]["category"] == "HR"
+        assert documents[1]["category"] == "Technical"
+
+
+    def test_batch_upload_rejects_more_than_five_documents(tmp_path: Path) -> None:
+        app = create_app(upload_dir=tmp_path)
+        client = TestClient(app)
+        files = [
+            ("files", (f"document-{index}.docx", _docx_bytes("Employee policy"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+            for index in range(6)
+        ]
+
+        response = client.post("/uploads", files=files)
+
+        assert response.status_code == 400
+        assert "5 documents" in response.json()["detail"]
+
+
+    def _docx_bytes(text: str) -> bytes:
+        document = Document()
+        document.add_paragraph(text)
+        buffer = io.BytesIO()
+        document.save(buffer)
+        return buffer.getvalue()

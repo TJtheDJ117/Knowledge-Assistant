@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+pandas
+python-docx
+pypdf
+scikit-learn
+pytest
+httpx

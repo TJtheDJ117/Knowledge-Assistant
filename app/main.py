@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from typing import Optional
 
@@ -8,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from docx import Document as DocxDocument
 from pypdf import PdfReader
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
 
 
 class UploadResponse(BaseModel):
@@ -19,6 +20,13 @@ class UploadResponse(BaseModel):
     category: str
     confidence: float
     matched_keywords: list[str]
+
+
+class BatchUploadResponse(BaseModel):
+    documents: list[UploadResponse]
+
+
+MAX_BATCH_UPLOADS = 5
 
 
 def create_app(upload_dir: Optional[Path] = None) -> FastAPI:
@@ -40,28 +48,19 @@ def create_app(upload_dir: Optional[Path] = None) -> FastAPI:
 
     @app.post("/upload", response_model=UploadResponse)
     async def upload_file(file: UploadFile = File(...)) -> UploadResponse:
+        return await process_upload(file, upload_path)
+
+    @app.post("/uploads", response_model=BatchUploadResponse)
+    async def upload_files(files: list[UploadFile] = File(...)) -> BatchUploadResponse:
+        if not files or len(files) > MAX_BATCH_UPLOADS:
+            raise HTTPException(status_code=400, detail="You can upload a maximum of 5 documents at a time")
+
         allowed_types = {"application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
-        if file.content_type not in allowed_types:
-            raise HTTPException(status_code=400, detail="Unsupported file type")
+        if any(file.content_type not in allowed_types for file in files):
+            raise HTTPException(status_code=400, detail="All documents must be PDF or DOCX files")
 
-        destination = upload_path / file.filename
-        contents = await file.read()
-        destination.write_bytes(contents)
-
-        extracted_text = extract_text(destination)
-        cleaned_text = preprocess_text(extracted_text)
-        word_count = len(cleaned_text.split())
-        classification = classify_document(cleaned_text, file.filename)
-        return UploadResponse(
-            filename=file.filename,
-            extracted_text=extracted_text,
-            cleaned_text=cleaned_text,
-            word_count=word_count,
-            saved_path=str(destination),
-            category=classification["category"],
-            confidence=classification["confidence"],
-            matched_keywords=classification["matched_keywords"],
-        )
+        documents = [await process_upload(file, upload_path) for file in files]
+        return BatchUploadResponse(documents=documents)
 
     @app.get("/documents")
     def list_documents() -> list[dict[str, str | int | float | list[str]]]:
@@ -94,6 +93,28 @@ def create_app(upload_dir: Optional[Path] = None) -> FastAPI:
     return app
 
 
+async def process_upload(file: UploadFile, upload_path: Path) -> UploadResponse:
+    filename = Path(file.filename or "document").name
+    destination = upload_path / filename
+    contents = await file.read()
+    destination.write_bytes(contents)
+
+    extracted_text = extract_text(destination)
+    cleaned_text = preprocess_text(extracted_text)
+    word_count = len(cleaned_text.split())
+    classification = classify_document(cleaned_text, filename)
+    return UploadResponse(
+        filename=filename,
+        extracted_text=extracted_text,
+        cleaned_text=cleaned_text,
+        word_count=word_count,
+        saved_path=str(destination),
+        category=classification["category"],
+        confidence=classification["confidence"],
+        matched_keywords=classification["matched_keywords"],
+    )
+
+
 app = create_app()
 
 
@@ -116,102 +137,45 @@ def preprocess_text(text: str) -> str:
     return df.loc[0, "text"]
 
 
+TRAINING_DOCUMENTS = [
+    ("employee benefits leave payroll recruitment staff training", "HR"),
+    ("performance review workplace policy employee handbook annual leave", "HR"),
+    ("invoice budget revenue expense financial forecast profit tax", "Finance"),
+    ("cash flow accounts payable quarterly budget cost analysis", "Finance"),
+    ("contract agreement liability legal clause compliance privacy terms", "Legal"),
+    ("vendor agreement termination audit regulatory requirements", "Legal"),
+    ("software API database backend server deployment cloud security", "Technical"),
+    ("application code frontend system architecture technical documentation", "Technical"),
+    ("workflow inventory supply shipment logistics vendor delivery", "Operations"),
+    ("operations process facility timeline procurement business continuity", "Operations"),
+]
+
+TRAINING_TEXTS = [text for text, _ in TRAINING_DOCUMENTS]
+TRAINING_LABELS = [label for _, label in TRAINING_DOCUMENTS]
+CLASSIFIER_VECTORIZER = TfidfVectorizer(
+    lowercase=True,
+    stop_words="english",
+    ngram_range=(1, 2),
+)
+CLASSIFIER = LogisticRegression(C=5.0, max_iter=1000, random_state=42)
+CLASSIFIER.fit(CLASSIFIER_VECTORIZER.fit_transform(TRAINING_TEXTS), TRAINING_LABELS)
+
+
 def classify_document(text: str, filename: str = "") -> dict[str, object]:
-    normalized = re.sub(r"[^a-z0-9\s]", " ", text.lower())
-    normalized = " ".join(normalized.split())
-    filename_text = filename.lower()
-
-    rules = {
-        "HR": [
-            "employee",
-            "benefits",
-            "policy",
-            "leave",
-            "staff",
-            "training",
-            "salary",
-            "payroll",
-            "performance",
-            "recruitment",
-            "workforce",
-            "hours",
-        ],
-        "Finance": [
-            "invoice",
-            "budget",
-            "revenue",
-            "expense",
-            "cost",
-            "financial",
-            "tax",
-            "cash",
-            "forecast",
-            "profit",
-            "salary",
-            "payroll",
-        ],
-        "Legal": [
-            "contract",
-            "agreement",
-            "compliance",
-            "terms",
-            "liability",
-            "legal",
-            "clause",
-            "policy",
-            "privacy",
-            "termination",
-            "audit",
-        ],
-        "Technical": [
-            "api",
-            "software",
-            "system",
-            "application",
-            "database",
-            "deployment",
-            "cloud",
-            "backend",
-            "frontend",
-            "code",
-            "server",
-            "security",
-        ],
-        "Operations": [
-            "process",
-            "workflow",
-            "supply",
-            "inventory",
-            "shipment",
-            "logistics",
-            "operations",
-            "vendor",
-            "delivery",
-            "facility",
-            "timeline",
-        ],
-    }
-
-    scores: dict[str, float] = {}
-    matches_by_category: dict[str, list[str]] = {}
-
-    for category, keywords in rules.items():
-        matches = sorted({keyword for keyword in keywords if keyword in normalized or keyword in filename_text})
-        if matches:
-            coverage = len(matches) / max(1, len(keywords))
-            scores[category] = round(min(1.0, coverage + 0.15), 2)
-            matches_by_category[category] = matches
-
-    if not scores:
-        return {"category": "General", "confidence": 0.15, "matched_keywords": []}
-
-    best_category, best_score = max(
-        scores.items(),
-        key=lambda item: (item[1], len(matches_by_category[item[0]])),
-    )
-
+    cleaned_text = preprocess_text(f"{filename} {text}")
+    vector = CLASSIFIER_VECTORIZER.transform([cleaned_text])
+    probabilities = CLASSIFIER.predict_proba(vector)[0]
+    best_index = probabilities.argmax()
+    best_category = str(CLASSIFIER.classes_[best_index])
+    best_score = float(probabilities[best_index])
+    feature_names = CLASSIFIER_VECTORIZER.get_feature_names_out()
+    matched_keywords = sorted(
+        feature_names[index]
+        for index in vector.nonzero()[1]
+        if " " not in feature_names[index]
+    )[:5]
     return {
         "category": best_category,
-        "confidence": float(best_score),
-        "matched_keywords": matches_by_category[best_category],
+        "confidence": round(best_score, 2),
+        "matched_keywords": matched_keywords,
     }

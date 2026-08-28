@@ -24,7 +24,7 @@
       </header>
 
       <section class="hero" aria-labelledby="page-title">
-        <div class="eyebrow"><span>01</span> single document intake</div>
+        <div class="eyebrow"><span>01</span> multi-document intake</div>
         <h1 id="page-title">Bring your next<br /><em>big idea</em> to life.</h1>
         <p class="intro">Start with a document. We’ll make sure it arrives safe, sound, and ready for what’s next.</p>
       </section>
@@ -38,31 +38,30 @@
               <span class="icon-arrow">↑</span>
             </div>
             <div class="upload-copy">
-              <h2>Drop your file here</h2>
-              <p>or choose one from your device</p>
+              <h2>Drop your files here</h2>
+              <p>or choose up to five from your device</p>
             </div>
             <label class="browse-button" for="fileInput">
               <span>Browse files</span>
               <span class="button-arrow" aria-hidden="true">↗</span>
             </label>
-            <input id="fileInput" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+            <input id="fileInput" type="file" multiple accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
             <div class="drop-hint"><span class="tiny-dot"></span> drag &amp; drop enabled</div>
           </div>
 
           <div class="file-details" id="fileDetails" aria-live="polite">
             <span class="detail-label">SUPPORTED</span>
             <span class="detail-value">PDF <i>•</i> DOCX</span>
-            <span class="detail-label">MAX SIZE</span>
-            <span class="detail-value">10 MB</span>
+            <span class="detail-label">BATCH LIMIT</span>
+            <span class="detail-value">5 FILES</span>
           </div>
 
           <div class="selected-file" id="selectedFile" aria-live="polite" hidden>
-            <span class="file-badge file" aria-hidden="true">FILE</span>
-            <span class="file-summary">
-              <strong id="selectedFileName">No file selected</strong>
-              <span id="selectedFileMeta">Choose a document to continue</span>
-            </span>
-            <button class="remove-file" id="removeFile" type="button" aria-label="Remove selected file">×</button>
+            <div class="selected-files-controls">
+              <span class="selected-files-label" id="selectionCount">0 FILES SELECTED</span>
+              <button class="remove-file" id="removeFile" type="button" aria-label="Remove selected files">×</button>
+            </div>
+            <div class="selected-files-list"></div>
           </div>
           <button class="upload-button" id="uploadButton" type="button" disabled>
             <span id="uploadButtonText">Upload document</span>
