@@ -84,7 +84,7 @@ h1 em { color: var(--moss); font-family: Georgia, serif; font-weight: 400; }
 .detail-value i { color: var(--coral); font-style: normal; }
 .upload-button { display: flex; width: 100%; min-height: 54px; margin: 0 auto; padding: 16px 20px 16px 22px; border: 0; color: var(--paper); background: var(--moss); font-size: 13px; font-weight: 700; }
 .upload-button:disabled { cursor: not-allowed; opacity: 0.42; }
-.selected-file { display: flex; width: min(430px, 100%); min-height: 58px; align-items: center; gap: 12px; margin: 14px auto 0; padding: 10px 13px; color: var(--ink); background: rgba(251, 250, 246, 0.76); border: 1px solid var(--line); text-align: left; }
+.selected-file { display: flex; width: min(430px, 100%); min-height: 58px; align-items: stretch; gap: 10px; margin: 14px auto 0; padding: 12px 13px; color: var(--ink); background: rgba(251, 250, 246, 0.76); border: 1px solid var(--line); flex-direction: column; text-align: left; }
 .selected-file[hidden] { display: none; }
 .file-badge { display: grid; flex: 0 0 auto; width: 36px; height: 38px; place-items: center; color: var(--moss-dark); background: var(--acid); border-radius: 3px; font-family: "DM Mono", monospace; font-size: 8px; font-weight: 700; letter-spacing: 0.08em; }
 .file-badge.pdf { background: rgba(222, 96, 76, 0.12); border: 1px solid rgba(222, 96, 76, 0.32); color: #9d3d2d; }
@@ -97,6 +97,18 @@ h1 em { color: var(--moss); font-family: Georgia, serif; font-weight: 400; }
 .file-summary span { color: var(--muted); font-family: "DM Mono", monospace; font-size: 9px; }
 .remove-file { display: grid; flex: 0 0 auto; width: 25px; height: 25px; place-items: center; padding: 0; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 50%; cursor: pointer; font-size: 17px; line-height: 1; }
 .remove-file:hover { color: var(--ink); border-color: var(--moss); }
+.selected-files-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.selected-files-label { color: var(--muted); font-family: "DM Mono", monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; }
+.selected-files-list { display: grid; gap: 8px; width: 100%; max-height: 145px; overflow-y: auto; }
+.selected-file-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.selected-file-row .file-badge { width: 30px; height: 32px; font-size: 7px; }
+.selected-file-row .file-summary { gap: 2px; }
+.selected-files-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.selected-files-header strong { font-size: 12px; }
+.selected-files-list { display: grid; gap: 8px; width: 100%; max-height: 145px; overflow-y: auto; }
+.selected-file-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.selected-file-row .file-badge { width: 30px; height: 32px; font-size: 7px; }
+.selected-file-row .file-summary { gap: 2px; }
 
 .progress-panel { display: none; position: absolute; right: 9%; bottom: 34px; left: 9%; padding: 22px 25px; background: rgba(251, 250, 246, 0.95); border: 1px solid rgba(82, 107, 76, 0.2); box-shadow: 0 14px 30px rgba(55, 67, 51, 0.12); }
 .progress-track { height: 7px; margin-top: 18px; overflow: hidden; background: #dfe4d8; }
